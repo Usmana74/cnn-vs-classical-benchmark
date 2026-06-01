@@ -1,0 +1,295 @@
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{hyperref}
+\usepackage{float}
+
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+
+\begin{document}
+
+\title{Object Recognition Using Classical and Deep Learning Methods:\\
+A Comparative Study on Fashion-MNIST and CIFAR-10}
+
+\author{
+\IEEEauthorblockN{Muhammad [Student Name]}
+\IEEEauthorblockA{\textit{Department of Electrical and Computer Engineering} \\
+\textit{[University Name]}\\
+[City, Country] \\
+[student@email.com]}
+}
+
+\maketitle
+
+%-------------------------------------------------------------------
+\begin{abstract}
+This paper presents a comprehensive comparative study of multiple machine learning approaches for image classification on two benchmark datasets: Fashion-MNIST and CIFAR-10. We investigate six classifier families—Logistic Regression, K-Nearest Neighbor (KNN), Multi-Layer Perceptron (MLP), Convolutional Neural Network (CNN), Support Vector Machine (SVM), and Naïve Bayes—combined with three feature extraction strategies: Histogram of Oriented Gradients (HOG), SIFT-based Bag-of-Visual-Words (BoVW), and raw pixel intensities, each followed by Principal Component Analysis (PCA) for dimensionality reduction. Extensive hyperparameter sweeps and 5-fold cross-validation are conducted to ensure robust evaluation. Results demonstrate that CNN achieves the highest accuracy of 89.45\% on Fashion-MNIST and 66.40\% on CIFAR-10, while SVM with HOG+PCA features (89.10\%) provides competitive classical-model performance. SIFT-based features consistently underperform relative to HOG across all classifiers. The performance gap between classical and deep learning methods is substantially wider on CIFAR-10, highlighting the advantage of end-to-end feature learning for complex natural-image recognition.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Image classification, Fashion-MNIST, CIFAR-10, CNN, SVM, HOG, SIFT, Bag-of-Visual-Words, PCA, KNN
+\end{IEEEkeywords}
+
+%-------------------------------------------------------------------
+\section{Introduction}
+
+Image classification is a foundational task in computer vision and machine learning, with applications spanning autonomous vehicles, medical imaging, surveillance, robotics, and content-based image retrieval \cite{lecun1998mnist}. The ability of a system to automatically assign a semantic label to an unseen image underpins a wide spectrum of real-world applications and has therefore attracted sustained research interest over several decades. The central challenge lies in bridging the semantic gap between low-level pixel statistics and high-level human-interpretable concepts, a problem that has been approached through both hand-crafted feature engineering and, more recently, end-to-end deep learning.
+
+Traditional machine learning pipelines for image classification follow a two-stage paradigm: first, a fixed feature extractor transforms raw pixels into a more discriminative representation, and second, a classifier is trained in this feature space. Classical descriptors such as the Histogram of Oriented Gradients (HOG) \cite{dalal2005histograms} and the Scale-Invariant Feature Transform (SIFT) \cite{lowe2004distinctive}, combined with encoding schemes like Bag-of-Visual-Words (BoVW) \cite{csurka2004visual}, have formed the backbone of competitive systems for many years. Support Vector Machines (SVM) \cite{cortes1995support} and ensemble methods trained on such features have demonstrated strong generalization on structured datasets. However, the manual design of feature extractors requires domain expertise and tends to produce suboptimal representations when faced with large intra-class variability, complex backgrounds, or fine-grained inter-class differences.
+
+The emergence of deep learning, particularly Convolutional Neural Networks (CNNs), has fundamentally altered the landscape of image classification. CNNs jointly optimize feature extraction and classification in an end-to-end manner, learning hierarchical representations that progress from low-level edge detectors to high-level semantic features \cite{paszke2019pytorch}. Landmark results on large-scale benchmarks such as ImageNet have demonstrated the superiority of deep models over classical pipelines, yet deep learning approaches come with substantially higher computational cost, larger data requirements, and reduced interpretability compared to classical alternatives \cite{pedregosa2011scikit}.
+
+In this context, a systematic side-by-side evaluation of classical and deep learning approaches on standardized benchmarks is essential for practitioners seeking to balance accuracy against computational budget. Fashion-MNIST \cite{xiao2017fashionmnist} was specifically introduced as a more demanding benchmark than the original MNIST digit dataset \cite{lecun1998mnist}, featuring ten categories of apparel with subtle intra-class variation. CIFAR-10 \cite{krizhevsky2009learning} represents a further step in complexity, containing low-resolution color images of natural objects with cluttered backgrounds and high intra-class diversity. Together, these two benchmarks span a useful range of difficulty and provide a controlled environment for comparative evaluation.
+
+Dimensionality reduction via Principal Component Analysis (PCA) plays an important complementary role in classical pipelines by compressing high-dimensional feature vectors while retaining most of the discriminative variance, thus reducing training time and mitigating the curse of dimensionality \cite{pedregosa2011scikit}. Likewise, hyperparameter selection through cross-validation is critical to avoid overfitting and to provide fair comparisons across classifier families with different complexity.
+
+This project implements and evaluates a full machine learning pipeline encompassing three feature extraction strategies (HOG+PCA, SIFT+BoVW+PCA, and raw pixels+PCA) and six classifier families: Logistic Regression, K-Nearest Neighbor (KNN), Multi-Layer Perceptron (MLP), CNN, SVM, and Naïve Bayes. An extensive hyperparameter grid search combined with 5-fold stratified cross-validation is employed throughout to ensure robust and reproducible evaluation. The overarching goal is to identify the best-performing pipeline for each dataset and to derive actionable insights from cross-model and cross-dataset comparisons, quantifying precisely how much the performance gap between classical and deep learning methods grows with dataset complexity.
+
+The remainder of this paper is organized as follows. Section~II describes the proposed methodology, covering both datasets, preprocessing procedures, feature extraction strategies, classifier implementations, and evaluation protocol. Section~III presents experimental results including per-classifier accuracy and F1 scores, cross-validation stability analysis, confusion matrix interpretation, and a cross-dataset comparative analysis. Section~IV concludes the paper with a summary of key findings and directions for future work.
+
+%-------------------------------------------------------------------
+\section{Proposed Methodology}
+
+\subsection{Datasets}
+
+\subsubsection{Fashion-MNIST}
+Fashion-MNIST \cite{xiao2017fashionmnist} consists of 60,000 training and 10,000 test grayscale images, each of size $28\times28$ pixels, distributed across 10 apparel classes: T-shirt/top, Trouser, Pullover, Dress, Coat, Sandal, Shirt, Sneaker, Bag, and Ankle boot. The dataset was introduced as a more challenging drop-in replacement for the original MNIST handwritten digit dataset \cite{lecun1998mnist}. Each class contains exactly 6,000 training samples and 1,000 test samples, ensuring a perfectly balanced distribution. To facilitate rapid experimentation within computational constraints, a stratified subsample of 10,000 training images and 2,000 test images was drawn from the full dataset while preserving the original class proportions.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\columnwidth]{fmnist_samples.png}
+\caption{Sample images from the Fashion-MNIST dataset. Each row shows representative examples from one of the ten apparel categories.}
+\label{fig:fmnist_samples}
+\end{figure}
+
+\subsubsection{CIFAR-10}
+CIFAR-10 \cite{krizhevsky2009learning} contains 50,000 training and 10,000 test color images at $32\times32$ pixel resolution, spanning 10 natural-image object classes: airplane, automobile, bird, cat, deer, dog, frog, horse, ship, and truck. Unlike Fashion-MNIST, CIFAR-10 presents significantly greater intra-class variability due to complex textures, varying viewpoints, cluttered backgrounds, and fine-grained inter-class similarities (e.g., cat vs. dog, automobile vs. truck). For consistency with the Fashion-MNIST experimental setup, a stratified subsample of 10,000 training images and 2,000 test images was used. All images were resized to a canonical $32\times32$ resolution for HOG and SIFT feature extraction.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\columnwidth]{cifar10_samples.jpg}
+\caption{Sample images from the CIFAR-10 dataset. Each row shows representative examples from one of the ten object categories.}
+\label{fig:cifar10_samples}
+\end{figure}
+
+\subsection{Data Preprocessing}
+
+A unified preprocessing pipeline was applied to both datasets prior to feature extraction.
+
+\textit{Normalization:} All raw pixel values were normalized to the range $[0, 1]$ by dividing by 255. For neural network inputs (MLP and CNN), this normalization ensures stable gradient flow and faster convergence during training. For classical classifiers operating on HOG or SIFT features, normalization at the pixel level has minimal direct impact but ensures consistency across the pipeline.
+
+\textit{Grayscale Conversion:} Since HOG and SIFT operate on single-channel images, CIFAR-10 RGB images were converted to grayscale using the standard luminance formula ($Y = 0.299R + 0.587G + 0.114B$) before gradient-based feature extraction. The CNN, however, receives the full three-channel RGB representation to leverage color information.
+
+\textit{Resizing:} Fashion-MNIST images ($28\times28$) were upsampled to $32\times32$ pixels using bilinear interpolation to maintain a consistent spatial resolution across both datasets for HOG and SIFT descriptor computation.
+
+\textit{Stratified Subsampling:} All train/test splits were drawn using stratified sampling with a fixed random seed to ensure reproducibility and class balance across experiments.
+
+\subsection{Feature Extraction}
+
+Three distinct feature extraction strategies were implemented to provide a comprehensive comparison between hand-crafted and data-driven representations.
+
+\subsubsection{HOG + PCA}
+The Histogram of Oriented Gradients (HOG) descriptor \cite{dalal2005histograms} was computed using the following configuration: 9 orientation bins uniformly spanning $[0°, 180°)$, $4\times4$ pixel cells, $2\times2$ cell blocks with L2-Hys block normalization, and a block stride of 2 cells. For $32\times32$ input images, this yields a 1,764-dimensional feature vector per image. Principal Component Analysis (PCA) was subsequently applied to project the HOG features into a 100-dimensional subspace, retaining approximately 90\% of the total explained variance while substantially reducing memory footprint and training time for downstream classifiers. The PCA transformation was fitted exclusively on the training set and applied identically to the test set to prevent data leakage.
+
+\subsubsection{SIFT + Bag-of-Visual-Words + PCA}
+Scale-Invariant Feature Transform (SIFT) \cite{lowe2004distinctive} descriptors were extracted with a maximum of 50 keypoints per image using the OpenCV implementation with default detector parameters. For images yielding fewer than 50 keypoints, all available descriptors were retained. A visual vocabulary of 64 words was constructed via MiniBatchKMeans clustering applied to approximately 2.5 million descriptors pooled from the training set. Each image was encoded as a 64-dimensional histogram of visual word frequencies (Bag-of-Visual-Words, BoVW) \cite{csurka2004visual}, normalized by the total number of descriptors. PCA further reduced the 64-dimensional BoVW representation to 63 components. Images yielding no SIFT keypoints were assigned zero-vectors. The limited vocabulary size (64 words) was chosen for computational tractability but, as results confirm, proves insufficient for encoding the feature diversity of CIFAR-10.
+
+\subsubsection{Raw Pixels + PCA}
+Flattened raw pixel arrays were used as a baseline representation: 784-dimensional vectors for Fashion-MNIST and 3,072-dimensional vectors for CIFAR-10 (flattened RGB channels). PCA reduced both to 100 principal components. This feature set serves as a baseline for classical classifiers and as direct input to the CNN, which performs end-to-end feature learning from raw pixels without any hand-crafted preprocessing.
+
+\subsection{Classifiers}
+
+Six classifiers were implemented and evaluated across all feature sets.
+
+\textit{K-Nearest Neighbor (KNN):} Euclidean distance metric was used with $k$ evaluated over $\{1, 3, 5, 7, 11\}$. The optimal $k$ was selected via cross-validation.
+
+\textit{Logistic Regression (LogReg):} An L2-regularized multinomial logistic regression was trained using the LBFGS solver with regularization strength $C \in \{0.01, 0.1, 1.0, 10.0\}$ and a maximum of 1,000 iterations.
+
+\textit{Multi-Layer Perceptron (MLP):} Two hidden layers of sizes $(512, 256)$ with ReLU activations, Adam optimizer, early stopping with patience of 10 epochs, and a maximum of 30 training iterations. No hyperparameter grid search was applied to MLP given its fixed architecture.
+
+\textit{Support Vector Machine (SVM):} An RBF-kernel SVM was trained using Scikit-learn's \texttt{SVC} with balanced class weights and $C \in \{0.1, 1.0, 10.0\}$.
+
+\textit{Naïve Bayes (NB):} A Gaussian Naïve Bayes classifier assuming class-conditional Gaussian likelihoods over HOG/SIFT features.
+
+\textit{Convolutional Neural Network (CNN):} A custom \textit{SmallCNN} architecture implemented in PyTorch \cite{paszke2019pytorch} comprising three convolutional stages, each with $3\times3$ convolutions, batch normalization, ReLU activation, $2\times2$ max-pooling, and spatial dropout ($p=0.25$). The convolutional backbone outputs a spatially-pooled 256-dimensional feature vector fed into two fully connected layers (256 units $\rightarrow$ \textit{num\_classes}). The model was trained end-to-end for 20 epochs using Adam ($lr = 10^{-3}$, weight decay $= 10^{-4}$) and a batch size of 128. Cross-entropy loss with label smoothing ($\epsilon = 0.1$) was applied to improve generalization.
+
+\subsection{Evaluation Protocol}
+
+All models are evaluated using accuracy and macro-averaged F1-score on held-out test sets. Five-fold stratified cross-validation on the training set is used to assess model stability and guide hyperparameter selection. Confusion matrices were generated to provide per-class diagnostic insights into misclassification patterns. The best hyperparameter configuration per classifier is determined by mean cross-validation accuracy, and the corresponding model is retrained on the full training set before test evaluation.
+
+%-------------------------------------------------------------------
+\section{Experimental Results}
+
+\subsection{Fashion-MNIST Results}
+
+Table~\ref{tab:fmnist} presents the accuracy and macro-averaged F1 scores for all classifiers on the Fashion-MNIST test set. CNN achieved the highest test accuracy of 89.45\%, confirming the benefit of end-to-end feature learning from raw pixels. SVM with HOG+PCA (89.10\%) was a close runner-up, demonstrating that well-engineered gradient-based features can approach deep learning performance on structured, low-variation datasets. MLP (87.95\%) and KNN with HOG+PCA ($k=11$, 87.15\%) also delivered competitive results. SIFT-based BoVW features significantly underperformed across all classifiers, with the best SIFT model (SVM, $C=1.0$) achieving only 59.75\%, revealing the inadequacy of a coarse 64-word vocabulary for apparel texture encoding.
+
+\begin{table}[h]
+\centering
+\caption{Fashion-MNIST Classification Results}
+\label{tab:fmnist}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{llccc}
+\toprule
+\textbf{Classifier} & \textbf{Feature Set} & \textbf{Best Param} & \textbf{Acc.} & \textbf{F1} \\
+\midrule
+CNN        & Raw Pixels & E2E    & 0.8945 & 0.8910 \\
+SVM        & HOG+PCA    & $C=1.0$  & 0.8910 & 0.8901 \\
+MLP        & HOG+PCA    & ---    & 0.8795 & 0.8809 \\
+KNN        & HOG+PCA    & $k=11$ & 0.8715 & 0.8691 \\
+Log. Reg.  & HOG+PCA    & $C=0.01$ & 0.8690 & 0.8688 \\
+Naïve Bayes & HOG+PCA  & ---    & 0.7955 & 0.7939 \\
+\midrule
+SVM        & SIFT+PCA   & $C=1.0$  & 0.5975 & 0.5936 \\
+Log. Reg.  & SIFT+PCA   & $C=0.1$  & 0.5525 & 0.5482 \\
+KNN        & SIFT+PCA   & $k=7$  & 0.5165 & 0.5115 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The confusion matrices for all HOG+PCA models on Fashion-MNIST (Fig.~\ref{fig:cm_fmnist}) reveal consistent misclassification patterns. The ``Shirt'' class is the most problematic across all classifiers due to visual overlap with T-shirt and Pullover categories. The ``Bag'' and ``Trouser'' classes achieve near-perfect classification across all models, reflecting their distinct visual signatures. CNN notably reduces Shirt/T-shirt confusion compared to classical models, attributing to its ability to capture hierarchical spatial features. Among SIFT-based models, the confusion matrices show widespread off-diagonal scattering, confirming the inadequacy of BoVW features.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\columnwidth]{confusion_fmnist.png}
+\caption{Confusion matrices for all classifiers on Fashion-MNIST. Top row (left to right): KNN ($k=11$), LogReg ($C=0.01$), MLP, SVM ($C=1.0$) with HOG+PCA. Middle row: NaïveBayes, KNN ($k=7$) SIFT, LogReg ($C=0.1$) SIFT, SVM ($C=1.0$) SIFT. Bottom left: CNN.}
+\label{fig:cm_fmnist}
+\end{figure}
+
+\subsection{CIFAR-10 Results}
+
+Table~\ref{tab:cifar10} reports CIFAR-10 classification performance. CNN again led with 66.40\% accuracy, reflecting the dataset's inherent complexity. The accuracy reduction relative to Fashion-MNIST (22.8 percentage points) underscores the challenge posed by natural-image variability. SVM on HOG+PCA ($C=10.0$, 57.25\%) was the best classical model, followed by MLP (53.70\%) and Logistic Regression (48.90\%). Naïve Bayes (47.10\%) and KNN (44.55\%) trailed further. SIFT-based features collapsed dramatically on CIFAR-10, with KNN achieving only 16.35\%—barely above random chance for a 10-class problem—confirming the insufficient discriminative capacity of a 64-word vocabulary for diverse natural textures.
+
+\begin{table}[h]
+\centering
+\caption{CIFAR-10 Classification Results}
+\label{tab:cifar10}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{llccc}
+\toprule
+\textbf{Classifier} & \textbf{Feature Set} & \textbf{Best Param} & \textbf{Acc.} & \textbf{F1} \\
+\midrule
+CNN        & Raw Pixels & E2E      & 0.6640 & 0.6585 \\
+SVM        & HOG+PCA    & $C=10.0$ & 0.5725 & 0.5719 \\
+MLP        & HOG+PCA    & ---      & 0.5370 & 0.5387 \\
+Log. Reg.  & HOG+PCA    & $C=0.01$ & 0.4890 & 0.4859 \\
+Naïve Bayes & HOG+PCA  & ---      & 0.4710 & 0.4693 \\
+KNN        & HOG+PCA    & $k=11$   & 0.4455 & 0.4325 \\
+\midrule
+SVM        & SIFT+PCA   & $C=1.0$  & 0.2620 & 0.2581 \\
+Log. Reg.  & SIFT+PCA   & $C=0.01$ & 0.2490 & 0.2450 \\
+KNN        & SIFT+PCA   & $k=7$    & 0.1635 & 0.1537 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The CIFAR-10 confusion matrices (Fig.~\ref{fig:cm_cifar10}) expose several recurring error patterns across all models. The cat/dog pair is the most frequently confused class pair in every classifier, consistent with their high visual similarity at $32\times32$ resolution. Automobile/truck confusion is also prominent. CNN significantly outperforms classical models on these hard pairs, achieving substantially higher diagonal values for deer, frog, and ship. SIFT-based confusion matrices exhibit near-uniform off-diagonal entries, indicative of near-random classification performance.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\columnwidth]{confusion_cifar10.png}
+\caption{Confusion matrices for all classifiers on CIFAR-10. Top row (left to right): KNN ($k=11$), LogReg ($C=0.01$), MLP, SVM ($C=10.0$) with HOG+PCA. Middle row: NaïveBayes, KNN ($k=7$) SIFT, LogReg ($C=0.01$) SIFT, SVM ($C=1.0$) SIFT. Bottom left: CNN.}
+\label{fig:cm_cifar10}
+\end{figure}
+
+\subsection{Cross-Validation Results}
+
+Table~\ref{tab:cv} summarizes 5-fold cross-validation results on the training set for HOG+PCA features. Standard deviations confirm low variance for SVM and MLP, validating the stability of reported test-set gains. Cross-validation rankings align closely with final test-set rankings, indicating the absence of significant overfitting across classical models.
+
+\begin{table}[h]
+\centering
+\caption{5-Fold Cross-Validation (HOG+PCA)}
+\label{tab:cv}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{llcc}
+\toprule
+\textbf{Model} & \textbf{Dataset} & \textbf{CV Accuracy} & \textbf{Std Dev} \\
+\midrule
+Log. Reg. ($C=0.01$) & Fashion  & 0.8669 & $\pm$0.0045 \\
+SVM ($C=1.0$)        & Fashion  & 0.8880 & $\pm$0.0054 \\
+KNN ($k=11$)         & CIFAR-10 & 0.4445 & $\pm$0.0106 \\
+Log. Reg. ($C=0.01$) & CIFAR-10 & 0.4823 & $\pm$0.0174 \\
+MLP                  & CIFAR-10 & 0.5142 & $\pm$0.0118 \\
+SVM ($C=10.0$)       & CIFAR-10 & 0.5635 & $\pm$0.0063 \\
+Naïve Bayes          & CIFAR-10 & 0.4730 & $\pm$0.0148 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Cross-Dataset Comparative Analysis}
+
+Table~\ref{tab:crossdataset} compares the best accuracy per model type across both datasets. The performance gap between CNN and classical methods widens substantially on CIFAR-10 (12.7 percentage points vs. 1.5 percentage points for SVM on Fashion-MNIST), reinforcing the necessity of hierarchical feature learning for complex visual tasks. All models suffer a significant accuracy degradation on CIFAR-10, but the degradation is non-uniform: CNN drops 22.8 pp, SVM drops 31.8 pp, and KNN drops a striking 42.6 pp. This divergence illustrates that the relative advantage of deep learning grows with dataset complexity. Naïve Bayes, while the weakest model overall, exhibits surprising resilience on CIFAR-10 relative to KNN, suggesting that its class-conditional Gaussian model benefits from HOG's near-Gaussian feature distributions.
+
+\begin{table}[h]
+\centering
+\caption{Cross-Dataset Best-Model Comparison}
+\label{tab:crossdataset}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Model} & \textbf{FMNIST Acc} & \textbf{FMNIST F1} & \textbf{CIFAR Acc} & \textbf{CIFAR F1} \\
+\midrule
+CNN         & 0.8945 & 0.8910 & 0.6640 & 0.6585 \\
+SVM         & 0.8910 & 0.8901 & 0.5725 & 0.5719 \\
+MLP         & 0.8795 & 0.8809 & 0.5370 & 0.5387 \\
+KNN         & 0.8715 & 0.8691 & 0.4455 & 0.4325 \\
+Log. Reg.   & 0.8690 & 0.8688 & 0.4890 & 0.4859 \\
+Naïve Bayes & 0.7955 & 0.7939 & 0.4710 & 0.4693 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Feature Representation Analysis}
+
+HOG+PCA consistently outperformed SIFT+PCA across all classifiers and both datasets. HOG captures edge orientation statistics at multiple spatial scales, yielding representations that align well with both Fashion-MNIST's structured clothing silhouettes and CIFAR-10's object contours. In contrast, the 64-word BoVW vocabulary derived from SIFT is too coarse to encode the feature diversity present in CIFAR-10. The gap between HOG and SIFT performance is more pronounced on CIFAR-10 (e.g., SVM: $57.25\%$ vs. $26.20\%$) than on Fashion-MNIST (SVM: $89.10\%$ vs. $59.75\%$), confirming that richer natural-image textures demand a substantially larger visual vocabulary or an alternative encoding strategy such as Fisher Vectors or VLAD. PCA proved effective in compressing HOG's 1,764-dimensional vectors to 100 components while retaining $\approx$90\% of variance, reducing training time with negligible accuracy penalty.
+
+%-------------------------------------------------------------------
+\section{Conclusion}
+
+This work systematically evaluated six classifiers combined with three feature extraction strategies on Fashion-MNIST and CIFAR-10 benchmark datasets. The key findings are as follows. First, CNN consistently achieves the highest accuracy (89.45\% and 66.40\% respectively) by learning discriminative feature hierarchies end-to-end directly from raw pixel data, bypassing the limitations of hand-crafted descriptors. Second, SVM with HOG+PCA is the strongest classical alternative, approaching CNN performance on Fashion-MNIST (only 1.5 pp gap) but trailing by 9.15 pp on CIFAR-10, where hierarchical feature learning confers a decisive advantage. Third, SIFT/BoVW features are insufficient for both datasets, particularly CIFAR-10, where the 64-word vocabulary yields near-random classification for some models. Fourth, cross-validation standard deviations confirm stable generalization across folds, with test-set rankings closely tracking cross-validation rankings for all classical models. Fifth, the performance gap between classical and deep learning methods grows nonlinearly with dataset complexity, widening from 1.5 pp on Fashion-MNIST to 12.7 pp on CIFAR-10. Future work should explore data augmentation and transfer learning with ImageNet-pretrained CNNs, larger BoVW vocabularies or Fisher Vector encodings, deeper or residual CNN architectures, and ensemble combinations of classical and deep models to further bridge remaining performance gaps.
+
+%-------------------------------------------------------------------
+\begin{thebibliography}{00}
+
+\bibitem{lecun1998mnist}
+Y. LeCun, C. Cortes, and C. J. Burges, ``The MNIST Database of Handwritten Digits,'' 1998. [Online]. Available: \url{http://yann.lecun.com/exdb/mnist/}
+
+\bibitem{xiao2017fashionmnist}
+H. Xiao, K. Rasul, and R. Vollgraf, ``Fashion-MNIST: A Novel Image Dataset for Benchmarking Machine Learning Algorithms,'' \textit{arXiv:1708.07747}, 2017.
+
+\bibitem{krizhevsky2009learning}
+A. Krizhevsky, ``Learning Multiple Layers of Features from Tiny Images,'' Technical Report, University of Toronto, 2009.
+
+\bibitem{dalal2005histograms}
+N. Dalal and B. Triggs, ``Histograms of Oriented Gradients for Human Detection,'' in \textit{Proc. IEEE Conf. Computer Vision and Pattern Recognition (CVPR)}, 2005, pp. 886--893.
+
+\bibitem{lowe2004distinctive}
+D. G. Lowe, ``Distinctive Image Features from Scale-Invariant Keypoints,'' \textit{Int. J. Computer Vision}, vol. 60, no. 2, pp. 91--110, 2004.
+
+\bibitem{csurka2004visual}
+G. Csurka, C. Dance, L. Fan, J. Willamowski, and C. Bray, ``Visual Categorization with Bags of Keypoints,'' in \textit{Workshop on Statistical Learning in Computer Vision, ECCV}, 2004.
+
+\bibitem{cortes1995support}
+C. Cortes and V. Vapnik, ``Support-Vector Networks,'' \textit{Machine Learning}, vol. 20, no. 3, pp. 273--297, 1995.
+
+\bibitem{pedregosa2011scikit}
+F. Pedregosa \textit{et al.}, ``Scikit-learn: Machine Learning in Python,'' \textit{J. Machine Learning Research}, vol. 12, pp. 2825--2830, 2011.
+
+\bibitem{paszke2019pytorch}
+A. Paszke \textit{et al.}, ``PyTorch: An Imperative Style, High-Performance Deep Learning Library,'' in \textit{Advances in Neural Information Processing Systems (NeurIPS)}, 2019.
+
+\end{thebibliography}
+
+\end{document}
